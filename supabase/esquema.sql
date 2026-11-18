@@ -115,3 +115,16 @@ create policy "lo mio" on public.docs for all to authenticated
 do $$ begin
   alter publication supabase_realtime add table public.docs;
 exception when duplicate_object then null; end $$;
+
+-- Permisos de acceso a las tablas para usuarios con sesión
+-- (las reglas de arriba deciden después qué filas ve cada uno)
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on public.docs to authenticated;
+grant select on public.miembros to authenticated;
+revoke all on public.clubs from anon, authenticated;
+revoke all on public.docs from anon;
+revoke all on public.miembros from anon;
+grant execute on function public.unirse_club(text, text) to authenticated;
+grant execute on function public.mi_cuenta() to authenticated;
+grant execute on function public.cambiar_nombre(text) to authenticated;
+revoke execute on function public.unirse_club(text, text) from anon;
