@@ -140,3 +140,47 @@ language sql stable security definer set search_path = public as $$
   from miembros m join clubs c on c.id = m.club_id
   where m.user_id = auth.uid()
 $$;
+-- Altas de entrenadores hechas por coordinación
+create table if not exists public.invitaciones (
+  club_id uuid not null references public.clubs on delete cascade,
+  email text not null,
+  nombre text not null default '',
+  equipo text not null,
+  user_id uuid references auth.users on delete set null,
+  sincronizada boolean not null default false,
+  created_at timestamptz not null default now(),
+  primary key (club_id, email)
+);
+alter table public.invitaciones enable row level security;
+drop policy if exists "coordinacion invitaciones" on public.invitaciones;
+create policy "coordinacion invitaciones" on public.invitaciones for all to authenticated
+  using (club_id = public.mi_club() and public.soy_coord())
+  with check (club_id = public.mi_club() and public.soy_coord());
+grant select, insert, update, delete on public.invitaciones to authenticated;
+revoke all on public.invitaciones from anon;
+
+-- Al entrar por primera vez, si su correo tiene un alta pendiente, queda dentro del club con su equipo
+create or replace function public.aceptar_invitacion() returns json
+language plpgsql security definer set search_path = public as $$
+declare i invitaciones; uid text; a jsonb; ents jsonb; eqs jsonb;
+begin
+  if auth.uid() is null then return null; end if;
+  select * into i from invitaciones where lower(email) = lower(auth.email()) and user_id is null order by created_at desc limit 1;
+  if not found then return null; end if;
+  uid := auth.uid()::text;
+  insert into miembros (user_id, club_id, nombre, rol) values (auth.uid(), i.club_id, i.nombre, 'entrenador')
+  on conflict (user_id) do update set club_id = excluded.club_id,
+    nombre = case when miembros.nombre = '' then excluded.nombre else miembros.nombre end;
+  select data into a from docs where club_id = i.club_id and path = 'config/asignaciones';
+  a := coalesce(a, '{}'::jsonb);
+  ents := coalesce(a->'entrenadores', '{}'::jsonb);
+  eqs := coalesce(ents->uid, '[]'::jsonb);
+  if not eqs ? i.equipo then eqs := eqs || to_jsonb(i.equipo); end if;
+  a := a || jsonb_build_object('entrenadores', ents || jsonb_build_object(uid, eqs), 't', (extract(epoch from now()) * 1000)::bigint);
+  insert into docs (club_id, path, data) values (i.club_id, 'config/asignaciones', a)
+  on conflict (club_id, path) do update set data = excluded.data, updated_at = now();
+  update invitaciones set user_id = auth.uid() where club_id = i.club_id and email = i.email;
+  return json_build_object('equipo', i.equipo);
+end $$;
+grant execute on function public.aceptar_invitacion() to authenticated;
+revoke execute on function public.aceptar_invitacion() from anon;

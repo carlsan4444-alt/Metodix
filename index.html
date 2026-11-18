@@ -1247,6 +1247,12 @@ function vLogin(modo, msg){
       '<div class="field"><label for="ac-email">Correo electrónico</label><input id="ac-email" type="email" autocomplete="email" required></div>' +
       '<button class="btn" type="submit">Enviar enlace</button>' +
       '<button type="button" class="btn ghost small" data-acc="entrar">Volver</button>';
+  } else if(modo === 'bienvenida'){
+    h += '<h2 style="font:700 26px/1.1 var(--display)">Bienvenido a ' + esc((CUENTA && CUENTA.club) || 'tu club') + '</h2>' +
+      '<p class="note">La coordinación te ha dado de alta. Para terminar, escribe tu nombre y elige una contraseña: con ella entrarás las próximas veces.</p>' +
+      '<div class="field"><label for="ac-nombre">Nombre y apellidos</label><input id="ac-nombre" autocomplete="name" value="' + esc((CUENTA && CUENTA.nombre) || '') + '" required></div>' +
+      '<div class="field"><label for="ac-pass">Contraseña (mínimo 6 caracteres)</label><input id="ac-pass" type="password" autocomplete="new-password" required minlength="6"></div>' +
+      '<button class="btn" type="submit">Entrar en la plataforma</button>';
   } else if(modo === 'nueva'){
     h += '<h2 style="font:700 26px/1.1 var(--display)">Nueva contraseña</h2>' +
       '<div class="field"><label for="ac-pass">Contraseña nueva (mínimo 6 caracteres)</label><input id="ac-pass" type="password" autocomplete="new-password" required minlength="6"></div>' +
@@ -1255,7 +1261,7 @@ function vLogin(modo, msg){
   if(msg) h += '<p class="banner" role="status">' + esc(msg) + '</p>';
   return h + '</form></div><p class="brand-foot">Hecho en Asturias</p></main>';
 }
-function acceso(modo, msg){ temaMetodix(); S.ready = true; S.acceso = modo; S.accesoMsg = msg || ''; app.innerHTML = vLogin(modo, msg); }
+function acceso(modo, msg){ if(modo !== 'bienvenida') temaMetodix(); S.ready = true; S.acceso = modo; S.accesoMsg = msg || ''; app.innerHTML = vLogin(modo, msg); }
 
 document.addEventListener('click', function(e){
   var b = e.target.closest('[data-acc]'); if(!b || !SB) return;
@@ -1288,6 +1294,11 @@ document.addEventListener('submit', async function(e){
       var r4 = await SB.auth.resetPasswordForEmail(v('ac-email'), {redirectTo: location.origin + location.pathname});
       if(r4.error) throw r4.error;
       acceso('entrar', 'Si ese correo tiene cuenta, te llegará un enlace en unos minutos.');
+    } else if(modo === 'bienvenida'){
+      var r6 = await SB.auth.updateUser({password: document.getElementById('ac-pass').value, data: {sinClave: false}});
+      if(r6.error) throw r6.error;
+      await SB.rpc('cambiar_nombre', {n: v('ac-nombre')});
+      location.hash = ''; location.reload();
     } else if(modo === 'nueva'){
       var r5 = await SB.auth.updateUser({password: document.getElementById('ac-pass').value});
       if(r5.error) throw r5.error;
@@ -1307,7 +1318,7 @@ document.addEventListener('submit', async function(e){
 /* Devuelve {db, dl, u} si hay sesión y club; si no, muestra la pantalla de acceso y devuelve null */
 async function sbInit(){
   if(!window.supabase){ acceso('entrar', 'No se ha podido cargar la conexión. Comprueba tu internet y recarga la página.'); return null; }
-  SB = window.supabase.createClient(SB_URL, SB_KEY);
+  SB = window.supabase.createClient(SB_URL, SB_KEY, {auth: {flowType: 'implicit', detectSessionInUrl: true, persistSession: true}});
   if(/type=recovery/.test(location.hash)){
     await new Promise(function(r){ setTimeout(r, 400); });
     acceso('nueva'); return null;
@@ -1324,11 +1335,88 @@ async function sbInit(){
       if(!j.error){ CUENTA = (await SB.rpc('mi_cuenta')).data; }
     }
   }
+  if(!CUENTA){
+    var inv = await SB.rpc('aceptar_invitacion');
+    if(!inv.error && inv.data){ CUENTA = (await SB.rpc('mi_cuenta')).data; S.bienvenida = true; }
+  }
   if(!CUENTA){ acceso('club'); return null; }
+  if(S.bienvenida || (ses.user.user_metadata || {}).sinClave){ S.clubName = CUENTA.club; acceso('bienvenida'); temaClub(CUENTA.color1, CUENTA.color2); return null; }
   S.clubName = CUENTA.club;
   temaClub(CUENTA.color1, CUENTA.color2);
   return {db: sbDb(SB, CUENTA.club_id), dl: sbDownloads, u: sbUser(SB, uid)};
 }
+
+
+/* ---------- Altas de entrenadores por correo (solo web propia, solo coordinación) ---------- */
+S.inv = [];
+async function cargaInv(){
+  if(!SB || !ME.owner) return;
+  var r = await SB.from('invitaciones').select('*').order('created_at', {ascending: false});
+  if(r.error) return;
+  S.inv = r.data || [];
+  var pend = S.inv.filter(function(x){ return x.user_id && !x.sincronizada; });
+  for(var i = 0; i < pend.length; i++){
+    try{
+      await darEquipo(pend[i].user_id, pend[i].equipo);
+      await SB.from('invitaciones').update({sincronizada: true}).eq('club_id', pend[i].club_id).eq('email', pend[i].email);
+      pend[i].sincronizada = true;
+    }catch(e){}
+  }
+  askNames(S.inv.filter(function(x){ return x.user_id; }).map(function(x){ return x.user_id; }));
+  if(S.ready) softRender();
+}
+function vAltas(){
+  if(!SB || !ME.owner) return '';
+  var h = '<div class="card" style="display:grid;gap:10px;margin-top:10px"><b style="font:700 19px/1.1 var(--display)">Dar de alta a un entrenador</b>' +
+    '<p class="note" style="margin:0">Le llegará un correo con un enlace. Al abrirlo entra directamente con su equipo asignado y elige su contraseña.</p>' +
+    '<div class="grid2" style="margin-top:0"><div class="field"><label for="inv-nombre">Nombre y apellidos</label><input id="inv-nombre" autocomplete="off"></div>' +
+    '<div class="field"><label for="inv-email">Correo electrónico</label><input id="inv-email" type="email" autocomplete="off"></div></div>' +
+    '<div class="row" style="align-items:end"><div class="field" style="flex:1;min-width:200px"><label for="inv-eq">Equipo</label><select id="inv-eq">' +
+    TEAMS.map(function(t){ return '<option value="' + t.id + '">' + esc(t.n) + '</option>'; }).join('') + '</select></div>' +
+    '<button type="button" class="btn" data-inv="enviar">Dar de alta y enviar correo</button></div>';
+  var pend = S.inv.filter(function(x){ return !x.user_id; });
+  if(pend.length) h += '<div style="display:grid;gap:6px;margin-top:4px"><b style="font:600 15px/1.2 var(--display)">Pendientes de entrar</b>' + pend.map(function(x){
+    var tt = team(x.equipo);
+    return '<div class="row" style="justify-content:space-between;border-top:1px dashed var(--line);padding-top:6px"><span><b>' + esc(x.nombre || x.email) + '</b> · ' + esc(x.email) + ' · ' + esc(tt ? tt.n : x.equipo) + '</span>' +
+      '<span class="row"><button type="button" class="btn ghost small" data-inv="reenviar" data-e="' + esc(x.email) + '">Reenviar correo</button><button type="button" class="btn danger small" data-inv="borrar" data-e="' + esc(x.email) + '">Anular</button></span></div>';
+  }).join('') + '</div>';
+  return h + '</div>';
+}
+async function mandaEnlace(email, nombre){
+  var r = await SB.auth.signInWithOtp({email: email, options: {shouldCreateUser: true, emailRedirectTo: location.origin + location.pathname, data: {nombre: nombre || '', sinClave: true}}});
+  if(r.error) throw r.error;
+}
+document.addEventListener('click', async function(e){
+  var b = e.target.closest('[data-inv]'); if(!b || !SB || !ME.owner) return;
+  var a = b.dataset.inv;
+  b.disabled = true;
+  try{
+    if(a === 'enviar'){
+      var nombre = document.getElementById('inv-nombre').value.trim();
+      var email = document.getElementById('inv-email').value.trim().toLowerCase();
+      var eq = document.getElementById('inv-eq').value;
+      if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ toast('Escribe un correo válido.'); b.disabled = false; return; }
+      var r = await SB.from('invitaciones').upsert({club_id: CUENTA.club_id, email: email, nombre: nombre, equipo: eq, user_id: null, sincronizada: false});
+      if(r.error) throw r.error;
+      await mandaEnlace(email, nombre);
+      toast('Alta hecha. Le hemos enviado el correo a ' + email);
+      await cargaInv();
+    } else if(a === 'reenviar'){
+      await mandaEnlace(b.dataset.e, '');
+      toast('Correo reenviado');
+    } else if(a === 'borrar'){
+      var r2 = await SB.from('invitaciones').delete().eq('club_id', CUENTA.club_id).eq('email', b.dataset.e);
+      if(r2.error) throw r2.error;
+      toast('Alta anulada');
+      await cargaInv();
+    }
+  }catch(err){
+    var m = (err && err.message) || '';
+    toast(/rate limit/i.test(m) ? 'Se han enviado demasiados correos seguidos. Espera un rato y pulsa «Reenviar correo».' : 'No se ha podido completar: ' + m);
+    if(a === 'enviar') await cargaInv();
+  }
+  b.disabled = false;
+});
 
 async function init(){
   var db = null, u = null;
@@ -1348,6 +1436,7 @@ async function init(){
     var x = await sbInit(); if(!x) return;
     db = x.db; S.dl = x.dl; u = x.u; S.user = u;
     ME.owner = !!(await u.isOwner()); ME.uid = await u.id();
+    if(ME.owner) setTimeout(cargaInv, 2500);
   }
   if(!db){ ME.owner = true; loadLocal(); S.ready = true; ajustaTodas(); render(); return; }
   S.db = db;
@@ -1542,11 +1631,12 @@ function vAccesos(){
       return '<div class="row" style="justify-content:space-between"><span><b>' + esc(who(u)) + '</b> pide acceso a <b>' + esc(tt ? tt.n : S.sol[u].equipo) + '</b></span><span class="row"><button type="button" class="btn small" data-act="solOk" data-u="' + esc(u) + '">Aprobar</button><button type="button" class="btn danger small" data-act="solNo" data-u="' + esc(u) + '">Rechazar</button></span></div>';
     }).join('') + '</div>';
   }
+  h += vAltas();
   var us = Object.keys(S.asig);
   h += '<div class="card" style="display:grid;gap:12px;margin-top:10px">' + (us.length ? us.map(function(u){
     var ts = S.asig[u] || [];
     return '<div><div class="row" style="justify-content:space-between"><b style="font:600 18px/1.1 var(--display)">' + esc(who(u)) + '</b>' + (ts.length ? '' : '<span class="pill bad">Sin acceso</span>') + '</div><div class="days" style="margin-top:6px">' + TEAMS.map(function(t){ return '<label><input type="checkbox" data-act="asigT" data-u="' + esc(u) + '" data-t="' + t.id + '"' + (ts.indexOf(t.id) >= 0 ? ' checked' : '') + '> ' + esc(t.n) + '</label>'; }).join('') + '</div></div>';
-  }).join('') : '<p class="note" style="margin:0">Todavía no hay entrenadores. Comparte la plataforma con ellos: al entrar, cada uno elige su equipo y te llega aquí la solicitud.</p>') + '</div>';
+  }).join('') : '<p class="note" style="margin:0">Todavía no hay entrenadores. '+(SB ? 'Dales de alta arriba con su correo, o pásales el código del club para que se registren ellos.' : 'Comparte la plataforma con ellos: al entrar, cada uno elige su equipo y te llega aquí la solicitud.')+'</p>') + '</div>';
   return h;
 }
 async function saveAsig(){ try{ await S.db.doc('config/asignaciones').set({entrenadores:JSON.parse(JSON.stringify(S.asig)), t:Date.now()}); }catch(e){ toast('No se han podido guardar los accesos.'); } }
