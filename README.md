@@ -2,7 +2,7 @@
 
 Plataforma de metodología para clubes de fútbol formativo: banco de tareas con diagramas, borradores de sesión por mesociclo, plantillas, asistencia y valoración.
 
-- **Web:** https://carlsan4444-alt.github.io/Metodix/
+- **Web:** https://metodix-app.github.io/
 - **Primer club:** Cimadevilla CF (Gijón)
 
 ## Cómo está hecha
