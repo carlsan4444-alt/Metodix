@@ -1452,11 +1452,9 @@ function propCard(p, coord){
   return h + '</div></div>';
 }
 function vPropTeam(t){
-  if(!SB || S.readOnly) return '';
+  if(!SB || S.readOnly || ME.owner) return '';
   var mias = S.props.filter(function(p){ return p.path.indexOf('cuentas/' + ME.uid + '/') === 0; });
-  return '<div class="card" style="margin-top:14px;display:grid;gap:8px"><div class="row" style="justify-content:space-between"><b style="font:700 19px/1.1 var(--display)">Proponer un ejercicio</b>' +
-    '<button type="button" class="btn small" data-prop="nueva" data-eq="' + t.id + '">Nuevo ejercicio</button></div>' +
-    '<p class="note" style="margin:0">Rellena la ficha de un ejercicio que uséis. Coordinación lo revisa y, si lo aprueba, se añade al banco del club.</p>' +
+  return '<div class="card" style="margin-top:14px;display:grid;gap:8px"><button type="button" class="btn" data-prop="nueva" data-eq="' + t.id + '">Proponer un ejercicio</button>' +
     mias.map(function(p){ return propCard(p, false); }).join('') + '</div>';
 }
 function vPropCoord(){
