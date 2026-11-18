@@ -128,3 +128,15 @@ grant execute on function public.unirse_club(text, text) to authenticated;
 grant execute on function public.mi_cuenta() to authenticated;
 grant execute on function public.cambiar_nombre(text) to authenticated;
 revoke execute on function public.unirse_club(text, text) from anon;
+
+-- Colores de cada club (los usa la web al entrar)
+alter table public.clubs add column if not exists color_principal text not null default '#0B5CAD';
+alter table public.clubs add column if not exists color_acento text not null default '#D52B1E';
+
+create or replace function public.mi_cuenta() returns json
+language sql stable security definer set search_path = public as $$
+  select json_build_object('club_id', m.club_id, 'club', c.nombre, 'rol', m.rol, 'nombre', m.nombre,
+                           'color1', c.color_principal, 'color2', c.color_acento)
+  from miembros m join clubs c on c.id = m.club_id
+  where m.user_id = auth.uid()
+$$;

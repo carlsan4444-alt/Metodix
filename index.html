@@ -205,6 +205,22 @@ th{background:linear-gradient(180deg,var(--sky-soft),#EAF4F8)}
 .grp{background:var(--sky-soft)}
 .toast{border-color:var(--green)}
 .asb small{color:var(--green)}
+
+/* ===== Temas: Metodix (general) y colores de cada club ===== */
+:root{ --stripe:linear-gradient(90deg,var(--green) 0%,var(--sky) 60%,var(--gold) 100%); --on-green:#fff; }
+.band::after,.subbar::after{background:var(--stripe)}
+.btn{color:var(--on-green)}
+.chip[aria-pressed="true"]{color:var(--on-green)}
+.vbtn[aria-pressed="true"]{color:var(--on-green)}
+.band h1 small{color:var(--green-deep)}
+body.brand{background:linear-gradient(180deg,#F6F8FB 0%,#EEF2F7 100%)}
+body.brand .band{background:#fff}
+body.brand .band h1{font-size:34px;letter-spacing:.01em}
+body.brand .band h1 .mx-a{color:var(--green)} body.brand .band h1 .mx-b{color:var(--sky)}
+body.brand .banner{background:#F3F6FB;border-left-color:var(--sky)}
+.brand-foot{margin:18px 0 0;text-align:center;font-size:13px;color:var(--muted)}
+.brand-flag{display:flex;height:6px;border-radius:3px;overflow:hidden;margin:0 0 16px}
+.brand-flag i{flex:1}
 </style>
 </head>
 <body>
@@ -1180,9 +1196,29 @@ var sbDownloads = {
 };
 
 /* ---------- Pantalla de acceso ---------- */
+
+/* Colores: tema general de Metodix (azul Asturias, rojo Gijón y blanco) y tema de cada club */
+function mezcla(hex, con, t){ var a = parseInt(hex.slice(1), 16), b = parseInt(con.slice(1), 16);
+  var r = Math.round(((a>>16)&255)*(1-t) + ((b>>16)&255)*t), g = Math.round(((a>>8)&255)*(1-t) + ((b>>8)&255)*t), bl = Math.round((a&255)*(1-t) + (b&255)*t);
+  return '#' + ((1<<24) + (r<<16) + (g<<8) + bl).toString(16).slice(1); }
+function oscuro(hex){ var n = parseInt(hex.slice(1), 16); return (0.299*((n>>16)&255) + 0.587*((n>>8)&255) + 0.114*(n&255)) < 150; }
+function aplicaTema(c1, c2, stripe){
+  var r = document.documentElement.style;
+  r.setProperty('--green', c1); r.setProperty('--green-deep', mezcla(c1, '#000000', .2)); r.setProperty('--green-soft', mezcla(c1, '#ffffff', .88));
+  r.setProperty('--sky', c2); r.setProperty('--sky-deep', mezcla(c2, '#000000', .25)); r.setProperty('--sky-soft', mezcla(c2, '#ffffff', .86));
+  r.setProperty('--ok', c1); r.setProperty('--ok-soft', mezcla(c1, '#ffffff', .88));
+  r.setProperty('--on-green', oscuro(c1) ? '#fff' : '#0E1B3D');
+  r.setProperty('--stripe', stripe || ('linear-gradient(90deg,' + c1 + ' 0%,' + c1 + ' 55%,' + c2 + ' 55%,' + c2 + ' 100%)'));
+  r.setProperty('--metal', 'linear-gradient(115deg,' + mezcla(c1, '#ffffff', .9) + ' 0%,' + mezcla(c2, '#ffffff', .9) + ' 60%,#F7F9F8 100%)');
+}
+var AZUL_AST = '#0B5CAD', ROJO_GIJ = '#D52B1E';
+function temaMetodix(){ document.body.classList.add('brand');
+  aplicaTema(AZUL_AST, ROJO_GIJ, 'linear-gradient(90deg,' + AZUL_AST + ' 0 33.3%,#ffffff 33.3% 66.6%,' + ROJO_GIJ + ' 66.6% 100%)'); }
+function temaClub(c1, c2){ document.body.classList.remove('brand'); aplicaTema(c1 || '#0E1B3D', c2 || '#C9A227'); }
+
 function vLogin(modo, msg){
-  var h = '<header class="band"><div class="inner"><h1>Metodix<small>Metodología y sesiones de fútbol formativo</small></h1></div></header>' +
-    '<main class="inner" style="max-width:460px"><div class="card" style="margin-top:28px"><form id="acceso" class="edit" data-modo="'+modo+'">';
+  var h = '<header class="band"><div class="inner"><h1><span class="mx-a">Meto</span><span class="mx-b">dix</span><small>Metodología y sesiones de fútbol formativo</small></h1></div></header>' +
+    '<main class="inner" style="max-width:460px"><div class="card" style="margin-top:28px"><div class="brand-flag" aria-hidden="true"><i style="background:'+AZUL_AST+'"></i><i style="background:#fff;border-top:1px solid var(--line);border-bottom:1px solid var(--line)"></i><i style="background:'+ROJO_GIJ+'"></i></div><form id="acceso" class="edit" data-modo="'+modo+'">';
   if(modo === 'entrar'){
     h += '<h2 style="font:700 26px/1.1 var(--display)">Entrar</h2>' +
       '<div class="field"><label for="ac-email">Correo electrónico</label><input id="ac-email" type="email" autocomplete="email" required></div>' +
@@ -1217,9 +1253,9 @@ function vLogin(modo, msg){
       '<button class="btn" type="submit">Guardar</button>';
   }
   if(msg) h += '<p class="banner" role="status">' + esc(msg) + '</p>';
-  return h + '</form></div></main>';
+  return h + '</form></div><p class="brand-foot">Hecho en Asturias</p></main>';
 }
-function acceso(modo, msg){ S.ready = true; S.acceso = modo; S.accesoMsg = msg || ''; app.innerHTML = vLogin(modo, msg); }
+function acceso(modo, msg){ temaMetodix(); S.ready = true; S.acceso = modo; S.accesoMsg = msg || ''; app.innerHTML = vLogin(modo, msg); }
 
 document.addEventListener('click', function(e){
   var b = e.target.closest('[data-acc]'); if(!b || !SB) return;
@@ -1290,12 +1326,14 @@ async function sbInit(){
   }
   if(!CUENTA){ acceso('club'); return null; }
   S.clubName = CUENTA.club;
+  temaClub(CUENTA.color1, CUENTA.color2);
   return {db: sbDb(SB, CUENTA.club_id), dl: sbDownloads, u: sbUser(SB, uid)};
 }
 
 async function init(){
   var db = null, u = null;
   if(window.claude && typeof window.claude.use === 'function'){
+    temaClub('#0E1B3D', '#C9A227');
     try{
       var r = await Promise.all([window.claude.use('db'), window.claude.use('downloads'), window.claude.use('user')]);
       db = r[0]; S.dl = r[1]; u = r[2]; S.user = u;
