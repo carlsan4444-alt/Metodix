@@ -214,9 +214,9 @@ th{background:linear-gradient(180deg,var(--sky-soft),#EAF4F8)}
 .vbtn[aria-pressed="true"]{color:var(--on-green)}
 .band h1 small{color:var(--green-deep)}
 body.brand{background:linear-gradient(180deg,#F6F8FB 0%,#EEF2F7 100%)}
-body.brand .band{background:#fff}
+body.brand .band{background:linear-gradient(115deg,#EAF5FC 0%,#FFFBEA 55%,#F8EEF0 100%)}
 body.brand .band h1{font-size:34px;letter-spacing:.01em}
-body.brand .band h1 .mx-a{color:var(--green)} body.brand .band h1 .mx-b{color:var(--sky)}
+body.brand .band h1 .mx-a{color:#2B86C2} body.brand .band h1 .mx-b{color:var(--green)}
 body.brand .banner{background:#F3F6FB;border-left-color:var(--sky)}
 .brand-foot{margin:18px 0 0;text-align:center;font-size:13px;color:var(--muted)}
 .brand-flag{display:flex;height:6px;border-radius:3px;overflow:hidden;margin:0 0 16px}
@@ -1211,14 +1211,14 @@ function aplicaTema(c1, c2, stripe){
   r.setProperty('--stripe', stripe || ('linear-gradient(90deg,' + c1 + ' 0%,' + c1 + ' 55%,' + c2 + ' 55%,' + c2 + ' 100%)'));
   r.setProperty('--metal', 'linear-gradient(115deg,' + mezcla(c1, '#ffffff', .9) + ' 0%,' + mezcla(c2, '#ffffff', .9) + ' 60%,#F7F9F8 100%)');
 }
-var AZUL_AST = '#0B5CAD', ROJO_GIJ = '#D52B1E';
+var CELESTE = '#3E9FD8', GRANATE = '#7B1E30', AMARILLO = '#F2C230';
 function temaMetodix(){ document.body.classList.add('brand');
-  aplicaTema(AZUL_AST, ROJO_GIJ, 'linear-gradient(90deg,' + AZUL_AST + ' 0 33.3%,#ffffff 33.3% 66.6%,' + ROJO_GIJ + ' 66.6% 100%)'); }
+  aplicaTema(GRANATE, CELESTE, 'linear-gradient(90deg,' + CELESTE + ' 0 33.3%,' + AMARILLO + ' 33.3% 66.6%,' + GRANATE + ' 66.6% 100%)'); }
 function temaClub(c1, c2){ document.body.classList.remove('brand'); aplicaTema(c1 || '#0E1B3D', c2 || '#C9A227'); }
 
 function vLogin(modo, msg){
   var h = '<header class="band"><div class="inner"><h1><span class="mx-a">Meto</span><span class="mx-b">dix</span><small>Metodología y sesiones de fútbol formativo</small></h1></div></header>' +
-    '<main class="inner" style="max-width:460px"><div class="card" style="margin-top:28px"><div class="brand-flag" aria-hidden="true"><i style="background:'+AZUL_AST+'"></i><i style="background:#fff;border-top:1px solid var(--line);border-bottom:1px solid var(--line)"></i><i style="background:'+ROJO_GIJ+'"></i></div><form id="acceso" class="edit" data-modo="'+modo+'">';
+    '<main class="inner" style="max-width:460px"><div class="card" style="margin-top:28px"><div class="brand-flag" aria-hidden="true"><i style="background:'+CELESTE+'"></i><i style="background:'+AMARILLO+'"></i><i style="background:'+GRANATE+'"></i></div><form id="acceso" class="edit" data-modo="'+modo+'">';
   if(modo === 'entrar'){
     h += '<h2 style="font:700 26px/1.1 var(--display)">Entrar</h2>' +
       '<div class="field"><label for="ac-email">Correo electrónico</label><input id="ac-email" type="email" autocomplete="email" required></div>' +
@@ -1418,6 +1418,162 @@ document.addEventListener('click', async function(e){
   b.disabled = false;
 });
 
+
+/* ---------- Propuestas de ejercicios (entrenadores proponen, coordinación aprueba, Claude los añade al banco) ---------- */
+S.props = []; S.propsOk = false;
+var PROP_EST = {pendiente: 'Pendiente de revisar', aprobada: 'Aprobada', enviada: 'Enviada a Claude', anadida: 'Ya en el banco', rechazada: 'Rechazada'};
+var PROP_PILL = {pendiente: 'mid', aprobada: 'ok', enviada: 'gold', anadida: 'ok', rechazada: 'bad'};
+async function cargaProps(){
+  if(!SB || !ME.uid) return;
+  var q = SB.from('docs').select('path,data').eq('club_id', CUENTA.club_id);
+  q = ME.owner ? q.like('path', 'cuentas/%/propuestas/%') : q.like('path', 'cuentas/' + ME.uid + '/propuestas/%');
+  var r = await q;
+  if(r.error) return;
+  S.props = (r.data || []).map(function(x){ return Object.assign({}, x.data, {path: x.path}); })
+    .sort(function(a, b){ return (b.t || 0) - (a.t || 0); });
+  S.propsOk = true;
+  if(S.ready) softRender();
+}
+function propCard(p, coord){
+  var tt = team(p.equipo);
+  var h = '<div style="border-top:1px dashed var(--line);padding-top:8px;display:grid;gap:4px">' +
+    '<div class="row" style="justify-content:space-between"><b style="font:600 17px/1.15 var(--display)">' + esc(p.nombre || 'Sin nombre') + '</b><span class="pill ' + (PROP_PILL[p.estado] || '') + '">' + esc(PROP_EST[p.estado] || p.estado) + '</span></div>' +
+    '<span class="isub">' + (coord ? esc(p.autorNombre || 'Entrenador') + ' · ' : '') + esc(tt ? tt.n : '') + (p.duracion ? ' · ' + esc(p.duracion) + ' min' : '') + (p.modalidad ? ' · ' + esc(p.modalidad) : '') + '</span>';
+  if(p.objetivo) h += '<span style="font-size:14.5px"><b>Objetivo:</b> ' + esc(p.objetivo) + '</span>';
+  if(p.comentario) h += '<span class="note" style="margin:0">Coordinación: ' + esc(p.comentario) + '</span>';
+  h += '<div class="row">';
+  h += '<button type="button" class="btn ghost small" data-prop="ver" data-p="' + esc(p.path) + '">Ver ficha</button>';
+  if(coord){
+    if(p.estado === 'pendiente') h += '<button type="button" class="btn small" data-prop="aprobar" data-p="' + esc(p.path) + '">Aprobar</button><button type="button" class="btn danger small" data-prop="rechazar" data-p="' + esc(p.path) + '">Rechazar</button>';
+    if(p.estado === 'enviada') h += '<button type="button" class="btn ghost small" data-prop="anadida" data-p="' + esc(p.path) + '">Marcar como añadido al banco</button>';
+  } else if(p.estado === 'pendiente' || p.estado === 'rechazada'){
+    h += '<button type="button" class="btn ghost small" data-prop="editar" data-p="' + esc(p.path) + '">Editar</button>';
+  }
+  return h + '</div></div>';
+}
+function vPropTeam(t){
+  if(!SB || S.readOnly) return '';
+  var mias = S.props.filter(function(p){ return p.path.indexOf('cuentas/' + ME.uid + '/') === 0; });
+  return '<div class="card" style="margin-top:14px;display:grid;gap:8px"><div class="row" style="justify-content:space-between"><b style="font:700 19px/1.1 var(--display)">Proponer un ejercicio</b>' +
+    '<button type="button" class="btn small" data-prop="nueva" data-eq="' + t.id + '">Nuevo ejercicio</button></div>' +
+    '<p class="note" style="margin:0">Rellena la ficha de un ejercicio que uséis. Coordinación lo revisa y, si lo aprueba, se añade al banco del club.</p>' +
+    mias.map(function(p){ return propCard(p, false); }).join('') + '</div>';
+}
+function vPropCoord(){
+  if(!SB || !ME.owner) return '';
+  var pend = S.props.filter(function(p){ return p.estado === 'pendiente'; }).length;
+  var apr = S.props.filter(function(p){ return p.estado === 'aprobada'; }).length;
+  var vis = S.props.filter(function(p){ return p.estado !== 'anadida' && p.estado !== 'rechazada'; });
+  var h = '<div class="section-h"><h2>Ejercicios propuestos</h2><span>' + pend + ' por revisar · ' + apr + ' aprobados sin enviar</span></div>' +
+    '<div class="card" style="display:grid;gap:8px"><div class="row" style="justify-content:space-between">' +
+    '<span class="note" style="margin:0">Los aprobados se copian y se pegan en el chat con Claude, que los pasa al formato del banco con su diagrama.</span>' +
+    '<span class="row"><button type="button" class="btn ghost small" data-prop="nueva" data-eq="' + TEAMS[0].id + '">Proponer uno</button>' +
+    '<button type="button" class="btn small" data-prop="copiar"' + (apr ? '' : ' disabled') + '>Copiar aprobados para Claude</button></span></div>' +
+    (vis.length ? vis.map(function(p){ return propCard(p, true); }).join('') : '<p class="note" style="margin:0">No hay propuestas pendientes.</p>') + '</div>';
+  return h;
+}
+function textoProp(p){
+  var tt = team(p.equipo);
+  return [
+    '### ' + (p.nombre || 'Ejercicio sin nombre'),
+    'Propuesto por: ' + (p.autorNombre || '') + (tt ? ' (' + tt.n + ')' : ''),
+    'Modalidad: ' + (p.modalidad || '-') + ' · Duración: ' + (p.duracion || '-') + ' min · Etapas: ' + ((p.etapas || []).map(function(e){ return ETAPAS[e] || e; }).join(', ') || '-'),
+    'Fase / contenido: ' + (p.contenido || '-'),
+    'Objetivo: ' + (p.objetivo || '-'),
+    'Espacio: ' + (p.espacio || '-') + ' · Jugadores: ' + (p.jugadores || '-') + ' · Material: ' + (p.material || '-'),
+    'Desarrollo: ' + (p.desarrollo || '-'),
+    'Consignas: ' + (p.consignas || '-'),
+    'Variantes / progresión: ' + (p.variantes || '-'),
+    p.foto ? 'Tiene foto del diagrama (verla en la plataforma).' : 'Sin foto del diagrama.'
+  ].join('\n');
+}
+function abreProp(p){
+  var ed = !p.path || p.estado === 'pendiente' || p.estado === 'rechazada';
+  if(ME.owner && p.path) ed = false;
+  var m = document.getElementById('propModal');
+  if(!m){ m = document.createElement('div'); m.id = 'propModal'; document.body.appendChild(m); }
+  function f(id, lab, val, area, ph){
+    return '<div class="field"><label for="pf-' + id + '">' + lab + '</label>' + (area ? '<textarea id="pf-' + id + '"' + (ed ? '' : ' readonly') + ' placeholder="' + (ph || '') + '">' + esc(val || '') + '</textarea>' : '<input id="pf-' + id + '" value="' + esc(val || '') + '"' + (ed ? '' : ' readonly') + ' placeholder="' + (ph || '') + '">') + '</div>';
+  }
+  var et = p.etapas || [];
+  m.innerHTML = '<div style="position:fixed;inset:0;background:rgba(14,27,61,.45);z-index:60;overflow:auto;padding:24px 12px"><div class="card" style="max-width:720px;margin:0 auto;display:grid;gap:10px">' +
+    '<div class="row" style="justify-content:space-between"><b style="font:700 22px/1.1 var(--display)">' + (p.path ? esc(p.nombre || 'Ejercicio') : 'Nuevo ejercicio') + '</b><button type="button" class="btn ghost small" data-prop="cerrar">Cerrar</button></div>' +
+    f('nombre', 'Nombre del ejercicio', p.nombre, false, 'Ej.: Rondo 4x2 con cambio de orientación') +
+    '<div class="grid2" style="margin-top:0">' +
+    '<div class="field"><label for="pf-equipo">Equipo con el que lo usas</label><select id="pf-equipo"' + (ed ? '' : ' disabled') + '>' + TEAMS.map(function(t){ return '<option value="' + t.id + '"' + (t.id === p.equipo ? ' selected' : '') + '>' + esc(t.n) + '</option>'; }).join('') + '</select></div>' +
+    '<div class="field"><label for="pf-modalidad">Modalidad</label><select id="pf-modalidad"' + (ed ? '' : ' disabled') + '>' + ['Campo', 'Sala', 'Sala y campo'].map(function(o){ return '<option' + (o === p.modalidad ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select></div>' +
+    f('duracion', 'Duración (minutos)', p.duracion) + f('contenido', 'Fase del juego o contenido', p.contenido, false, 'Ej.: pase y movimiento, salida de balón…') + '</div>' +
+    '<div class="field"><label>Etapas en las que sirve</label><div class="days">' + Object.keys(ETAPAS).map(function(e){ return '<label><input type="checkbox" class="pf-et" value="' + e + '"' + (et.indexOf(e) >= 0 ? ' checked' : '') + (ed ? '' : ' disabled') + '> ' + ETAPAS[e] + '</label>'; }).join('') + '</div></div>' +
+    f('objetivo', 'Objetivo', p.objetivo, true) +
+    '<div class="grid2" style="margin-top:0">' + f('espacio', 'Espacio', p.espacio, false, 'Ej.: 20 × 15 m') + f('jugadores', 'Jugadores', p.jugadores, false, 'Ej.: 4 contra 2') + '</div>' +
+    f('material', 'Material', p.material) +
+    f('desarrollo', 'Desarrollo (cómo funciona)', p.desarrollo, true) +
+    f('consignas', 'Consignas para los jugadores', p.consignas, true) +
+    f('variantes', 'Variantes o progresión', p.variantes, true) +
+    '<div class="field"><label for="pf-foto">Foto o dibujo del diagrama (opcional)</label>' + (p.foto ? '<img src="' + p.foto + '" alt="Diagrama propuesto" style="max-width:100%;border-radius:10px;border:1px solid var(--line);margin-bottom:6px">' : '') + (ed ? '<input id="pf-foto" type="file" accept="image/*">' : '') + '</div>' +
+    (ed ? '<button type="button" class="btn" data-prop="guardar" data-p="' + esc(p.path || '') + '">' + (p.path ? 'Guardar cambios' : 'Enviar a coordinación') + '</button>' : '') +
+    (ME.owner && p.path && p.estado === 'pendiente' ? '<div class="field"><label for="pf-coment">Comentario para el entrenador (opcional)</label><input id="pf-coment"></div><div class="row"><button type="button" class="btn" data-prop="aprobar" data-p="' + esc(p.path) + '">Aprobar</button><button type="button" class="btn danger" data-prop="rechazar" data-p="' + esc(p.path) + '">Rechazar</button></div>' : '') +
+    '</div></div>';
+}
+function cierraProp(){ var m = document.getElementById('propModal'); if(m) m.innerHTML = ''; }
+function fotoReducida(file){
+  return new Promise(function(res, rej){
+    var fr = new FileReader();
+    fr.onload = function(){
+      var img = new Image();
+      img.onload = function(){
+        var k = Math.min(1, 1000 / Math.max(img.width, img.height)), c = document.createElement('canvas');
+        c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        res(c.toDataURL('image/jpeg', 0.75));
+      };
+      img.onerror = rej; img.src = fr.result;
+    };
+    fr.onerror = rej; fr.readAsDataURL(file);
+  });
+}
+function propBy(path){ return S.props.find(function(p){ return p.path === path; }); }
+async function guardaProp(path, data){ var d = Object.assign({}, data); delete d.path; await S.db.doc(path).set(d); }
+document.addEventListener('click', async function(e){
+  var b = e.target.closest('[data-prop]'); if(!b || !SB) return;
+  var a = b.dataset.prop, p = b.dataset.p ? propBy(b.dataset.p) : null;
+  try{
+    if(a === 'nueva'){ abreProp({equipo: b.dataset.eq, modalidad: 'Campo', etapas: [], estado: 'pendiente'}); return; }
+    if(a === 'ver' || a === 'editar'){ if(p) abreProp(p); return; }
+    if(a === 'cerrar'){ cierraProp(); return; }
+    b.disabled = true;
+    if(a === 'guardar'){
+      function v(id){ var el = document.getElementById('pf-' + id); return el ? el.value.trim() : ''; }
+      if(!v('nombre')){ toast('Ponle un nombre al ejercicio.'); b.disabled = false; return; }
+      var prev = b.dataset.p ? propBy(b.dataset.p) : null;
+      var d = {nombre: v('nombre'), equipo: v('equipo'), modalidad: v('modalidad'), duracion: v('duracion'), contenido: v('contenido'),
+        etapas: Array.from(document.querySelectorAll('.pf-et:checked')).map(function(x){ return x.value; }),
+        objetivo: v('objetivo'), espacio: v('espacio'), jugadores: v('jugadores'), material: v('material'),
+        desarrollo: v('desarrollo'), consignas: v('consignas'), variantes: v('variantes'),
+        foto: prev ? prev.foto || '' : '', estado: 'pendiente', comentario: '',
+        autor: ME.uid, autorNombre: (CUENTA && CUENTA.nombre) || '', t: Date.now()};
+      var fi = document.getElementById('pf-foto');
+      if(fi && fi.files && fi.files[0]) d.foto = await fotoReducida(fi.files[0]);
+      var path = b.dataset.p || ('cuentas/' + ME.uid + '/propuestas/p' + Date.now().toString(36));
+      await guardaProp(path, d);
+      cierraProp(); toast(ME.owner ? 'Ejercicio guardado' : 'Enviado a coordinación'); await cargaProps();
+    } else if((a === 'aprobar' || a === 'rechazar') && p && ME.owner){
+      var c = document.getElementById('pf-coment');
+      p.estado = a === 'aprobar' ? 'aprobada' : 'rechazada'; p.comentario = c ? c.value.trim() : (p.comentario || '');
+      await guardaProp(p.path, p); cierraProp(); toast(a === 'aprobar' ? 'Aprobado' : 'Rechazado'); await cargaProps();
+    } else if(a === 'anadida' && p && ME.owner){
+      p.estado = 'anadida'; await guardaProp(p.path, p); await cargaProps();
+    } else if(a === 'copiar' && ME.owner){
+      var apr = S.props.filter(function(x){ return x.estado === 'aprobada'; });
+      var txt = 'Claude, añade estos ejercicios aprobados al banco de Metodix (formato de la plataforma, con su diagrama):\n\n' + apr.map(textoProp).join('\n\n');
+      await navigator.clipboard.writeText(txt);
+      for(var i = 0; i < apr.length; i++){ apr[i].estado = 'enviada'; await guardaProp(apr[i].path, apr[i]); }
+      toast('Copiados ' + apr.length + '. Pégalos en el chat con Claude.'); await cargaProps();
+    }
+  }catch(err){ toast('No se ha podido completar: ' + ((err && err.message) || '')); }
+  b.disabled = false;
+});
+
 async function init(){
   var db = null, u = null;
   if(window.claude && typeof window.claude.use === 'function'){
@@ -1437,6 +1593,7 @@ async function init(){
     db = x.db; S.dl = x.dl; u = x.u; S.user = u;
     ME.owner = !!(await u.isOwner()); ME.uid = await u.id();
     if(ME.owner) setTimeout(cargaInv, 2500);
+    setTimeout(cargaProps, 1800);
   }
   if(!db){ ME.owner = true; loadLocal(); S.ready = true; ajustaTodas(); render(); return; }
   S.db = db;
@@ -1520,6 +1677,7 @@ function vHome(){
     }).join('') + '</ul>';
   }
   h += rosterHtml(t);
+  h += vPropTeam(t);
   if(!S.readOnly) h += '<div class="card" style="margin-top:14px"><div class="row"><div class="field" style="flex:1;min-width:180px"><label for="nd">Sesión para otro día</label><input id="nd" type="date" value="'+esc(addDays(S.week, 0))+'"></div><button type="button" class="btn ghost" data-act="newDay" data-t="'+t.id+'" style="align-self:end">Crear borrador</button></div></div>';
   return h + '</main>';
 }
@@ -1649,7 +1807,7 @@ async function darEquipo(u, tid){
   }catch(e){ toast('El acceso está dado, pero no se han podido copiar todas las sesiones.'); }
 }
 function vCoord(){
-  var h = vAccesos() + weekNav(), end = addDays(S.week, 6), rows = [], low = [], high = [], pendientes = [];
+  var h = vAccesos() + vPropCoord() + weekNav(), end = addDays(S.week, 6), rows = [], low = [], high = [], pendientes = [];
   TEAMS.forEach(function(t){
     var list = weekDates(t.id, S.week), conf = 0, tiempo = 0, val = 0, valTot = 0;
     list.forEach(function(f){
