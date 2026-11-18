@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Metodix</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="apple-touch-icon" href="icono-512.png">
+<meta name="theme-color" content="#7B1E30">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -221,6 +224,7 @@ body.brand .banner{background:#F3F6FB;border-left-color:var(--sky)}
 .brand-foot{margin:18px 0 0;text-align:center;font-size:13px;color:var(--muted)}
 .brand-flag{display:flex;height:6px;border-radius:3px;overflow:hidden;margin:0 0 16px}
 .brand-flag i{flex:1}
+.band .inner{align-items:center}
 </style>
 </head>
 <body>
@@ -1217,7 +1221,7 @@ function temaMetodix(){ document.body.classList.add('brand');
 function temaClub(c1, c2){ document.body.classList.remove('brand'); aplicaTema(c1 || '#0E1B3D', c2 || '#C9A227'); }
 
 function vLogin(modo, msg){
-  var h = '<header class="band"><div class="inner"><h1><span class="mx-a">Meto</span><span class="mx-b">dix</span><small>Metodología y sesiones de fútbol formativo</small></h1></div></header>' +
+  var h = '<header class="band"><div class="inner"><img src="favicon.svg" alt="" width="54" height="54" style="border-radius:13px;flex:none"><h1 style="margin-right:auto"><span class="mx-a">Meto</span><span class="mx-b">dix</span><small>Metodología y sesiones de fútbol formativo</small></h1></div></header>' +
     '<main class="inner" style="max-width:460px"><div class="card" style="margin-top:28px"><div class="brand-flag" aria-hidden="true"><i style="background:'+CELESTE+'"></i><i style="background:'+AMARILLO+'"></i><i style="background:'+GRANATE+'"></i></div><form id="acceso" class="edit" data-modo="'+modo+'">';
   if(modo === 'entrar'){
     h += '<h2 style="font:700 26px/1.1 var(--display)">Entrar</h2>' +
@@ -1640,7 +1644,7 @@ function who(uid){ return S.names[uid] || 'Entrenador sin nombre (' + String(uid
 
 /* ================= VISTAS ================= */
 function band(){
-  return '<header class="band"><div class="inner"><h1>'+(SB ? 'Metodix' : 'Sesiones Cimadevilla')+'<small>Borradores, revisión y valoración</small></h1><span class="club">'+esc(S.clubName || 'Cimadevilla CF')+' · 26/27'+(SB ? ' <button type="button" class="btn ghost small" data-acc="salir" style="margin-left:10px">Salir</button>' : '')+'</span></div></header>' +
+  return '<header class="band"><div class="inner">'+(SB ? '<img src="favicon.svg" alt="" width="44" height="44" style="border-radius:11px;flex:none">' : '')+'<h1 style="margin-right:auto">'+(SB ? 'Metodix' : 'Sesiones Cimadevilla')+'<small>Borradores, revisión y valoración</small></h1><span class="club">'+esc(S.clubName || 'Cimadevilla CF')+' · 26/27'+(SB ? ' <button type="button" class="btn ghost small" data-acc="salir" style="margin-left:10px">Salir</button>' : '')+'</span></div></header>' +
     '<nav class="roles" aria-label="Quién eres"><div class="inner"><div class="chips" role="group">' +
     (ME.owner ? '<button type="button" class="chip coord" data-act="role" data-r="coord" aria-pressed="'+(S.role === 'coord')+'">Coordinación</button>' : '') +
     myTeams().map(function(t){ return '<button type="button" class="chip" data-act="role" data-r="'+t.id+'" aria-pressed="'+(S.role === t.id)+'">'+esc(t.n)+'</button>'; }).join('') +
